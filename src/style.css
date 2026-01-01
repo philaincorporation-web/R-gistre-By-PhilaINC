@@ -16,7 +16,7 @@ body {
   justify-content: center;
   align-items: center;
   padding: 16px;
-  background-image: url("public/IA.gif");
+  background-image: url("/IA.gif");
   background-size: cover;
   background-position: center;
 }
