@@ -68,20 +68,20 @@ app.innerHTML = `
     class="social-link"
   >
     <img
-      src="/digie.jpeg"
+      src="public/digie.jpeg"
       alt="Site web"
       class="social-icon"
     />
   </a>
 
   <a
-    href="https://www.linkedin.com/showcase/digiewomen-awards/
+    href="https://www.linkedin.com/in/ton-profil"
     target="_blank"
     aria-label="LinkedIn"
     class="social-link"
   >
     <img
-      src="/linkdin.jpg"
+      src="public/linkdin.jpg"
       alt="LinkedIn"
       class="social-icon"
     />
@@ -94,7 +94,7 @@ app.innerHTML = `
     class="social-link"
   >
     <img
-      src="/facebook.jpg"
+      src="public/facebook.jpg"
       alt="Facebook"
       class="social-icon"
     />
@@ -107,7 +107,7 @@ app.innerHTML = `
     class="social-link"
   >
     <img
-      src="/whatsapp.jpg"
+      src="public/whatsapp.jpg"
       alt="WhatsApp"
       class="social-icon"
     />
@@ -120,7 +120,7 @@ app.innerHTML = `
     class="social-link"
   >
     <img
-      src="/Insta.jpg"
+      src="public/Insta.jpg"
       alt="Instagram"
       class="social-icon"
     />
