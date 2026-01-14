@@ -78,7 +78,33 @@ async function apiRequest(url, options = {}) {
 }
 
 async function apiGetById(userId) {
-  return apiRequest(`${API_URL}/ID/${encodeURIComponent(userId)}`);
+  // On certaines configurations, le endpoint /ID/:id peut renvoyer 405.
+  // On passe donc par /search, qui est déjà vérifié comme fonctionnant (voir logs H7/H9).
+  const results = await apiRequest(
+    `${API_URL}/search?ID=${encodeURIComponent(userId)}`
+  );
+
+  if (!Array.isArray(results) || results.length === 0) {
+    const notFoundError = new Error("404: ID not found");
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/01592d42-904b-4726-b815-4fe7c1031a60',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        sessionId:'debug-session',
+        runId:'pre-fix',
+        hypothesisId:'H11',
+        location:'src/main.js:apiGetById:not-found',
+        message:'User ID not found via search',
+        data:{ userId },
+        timestamp:Date.now()
+      })
+    }).catch(()=>{});
+    // #endregion agent log
+    throw notFoundError;
+  }
+
+  return results[0];
 }
 
 async function apiSearchByName(nom, prenom) {
