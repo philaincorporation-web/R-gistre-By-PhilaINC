@@ -8,22 +8,6 @@ const APP_BASE_URL = "https://r-gistre-by-phila-inc.vercel.app";
 
 // Utilitaires API
 async function apiRequest(url, options = {}) {
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/01592d42-904b-4726-b815-4fe7c1031a60',{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({
-      sessionId:'debug-session',
-      runId:'pre-fix',
-      hypothesisId:'H7',
-      location:'src/main.js:apiRequest:before-fetch',
-      message:'API request starting',
-      data:{ url, method:options.method || 'GET' },
-      timestamp:Date.now()
-    })
-  }).catch(()=>{});
-  // #endregion agent log
-
   const response = await fetch(url, options);
   let data = null;
 
@@ -38,41 +22,8 @@ async function apiRequest(url, options = {}) {
     const message =
       (data && (data.message || data.error)) ||
       `Erreur réseau (${response.status})`;
-    
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/01592d42-904b-4726-b815-4fe7c1031a60',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        sessionId:'debug-session',
-        runId:'pre-fix',
-        hypothesisId:'H8',
-        location:'src/main.js:apiRequest:error',
-        message:'API request failed',
-        data:{ url, status:response.status, statusText:response.statusText, message, data },
-        timestamp:Date.now()
-      })
-    }).catch(()=>{});
-    // #endregion agent log
-
     throw new Error(message);
   }
-
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/01592d42-904b-4726-b815-4fe7c1031a60',{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({
-      sessionId:'debug-session',
-      runId:'pre-fix',
-      hypothesisId:'H9',
-      location:'src/main.js:apiRequest:success',
-      message:'API request succeeded',
-      data:{ url, status:response.status, hasData:!!data },
-      timestamp:Date.now()
-    })
-  }).catch(()=>{});
-  // #endregion agent log
 
   return data;
 }
@@ -86,21 +37,6 @@ async function apiGetById(userId) {
 
   if (!Array.isArray(results) || results.length === 0) {
     const notFoundError = new Error("404: ID not found");
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/01592d42-904b-4726-b815-4fe7c1031a60',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        sessionId:'debug-session',
-        runId:'pre-fix',
-        hypothesisId:'H11',
-        location:'src/main.js:apiGetById:not-found',
-        message:'User ID not found via search',
-        data:{ userId },
-        timestamp:Date.now()
-      })
-    }).catch(()=>{});
-    // #endregion agent log
     throw notFoundError;
   }
 
@@ -192,47 +128,64 @@ async function generateAndDownloadQR(userId, nom, prenom) {
   return qrUrl;
 }
 
+// ✅ QR CODE GLOBAL (UNIQUE) POUR L'ÉVÉNEMENT
+// Ce QR pointe vers APP_BASE_URL?eventQr=1 et permet à n'importe quel participant
+// de scanner pour marquer sa présence via une recherche Nom/Prénom.
+async function generateGlobalPresenceQR() {
+  const qrLink = `${APP_BASE_URL}?eventQr=1`;
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrLink)}&color=000000&bgcolor=FFFFFF&qzone=1`;
+  
+  const canvas = document.createElement('canvas');
+  canvas.width = 340;
+  canvas.height = 420;
+  const ctx = canvas.getContext('2d');
+  
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+  ctx.strokeStyle = '#2c5aa0';
+  ctx.lineWidth = 8;
+  ctx.strokeRect(20, 20, 300, 300);
+  
+  const qrImg = new Image();
+  qrImg.crossOrigin = 'anonymous';
+  qrImg.onload = function() {
+    ctx.drawImage(qrImg, 20, 20, 300, 300);
+    ctx.fillStyle = '#2c5aa0';
+    ctx.font = 'bold 24px Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`QR PRÉSENCE`, 170, 360);
+    ctx.font = 'bold 18px Arial, sans-serif';
+    ctx.fillText('SCANNER POUR SIGNER', 170, 395);
+    
+    const finalDataUrl = canvas.toDataURL('image/png');
+    const link = document.createElement('a');
+    link.href = finalDataUrl;
+    link.download = `Presence_GLOBAL_EVENT.png`;
+    link.click();
+  };
+  qrImg.src = qrUrl;
+  
+  return qrUrl;
+}
+
 // ✅ VÉRIFICATION ANTI-TRICHERIE + MESSAGE PERSONNALISÉ (pour QR)
 async function checkPresenceWithQR(userId) {
   const todayColumn = getTodayColumnName();
   
   try {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/01592d42-904b-4726-b815-4fe7c1031a60',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        sessionId:'debug-session',
-        runId:'pre-fix',
-        hypothesisId:'H1',
-        location:'src/main.js:checkPresenceWithQR:entry',
-        message:'Enter checkPresenceWithQR',
-        data:{ userId, todayColumn },
-        timestamp:Date.now()
-      })
-    }).catch(()=>{});
-    // #endregion agent log
-
     const userData = await apiGetById(userId);
 
     const nomComplet = `${userData.Nom || ''} ${userData.Prénom || ''}`.trim() || "Utilisateur";
 
     if (userData[todayColumn] === "Présent") {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/01592d42-904b-4726-b815-4fe7c1031a60',{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({
-          sessionId:'debug-session',
-          runId:'pre-fix',
-          hypothesisId:'H2',
-          location:'src/main.js:checkPresenceWithQR:already-present',
-          message:'User already marked present for today',
-          data:{ userId, todayColumn },
-          timestamp:Date.now()
-        })
-      }).catch(()=>{});
-      // #endregion agent log
+      // Mémoriser l'ID sur l'appareil pour les prochains scans du QR global
+      try {
+        window.localStorage.setItem('presenceUserId', userId);
+      } catch (e) {
+        // ignore stockage local si désactivé
+      }
       showStatus(
         `✅ Bonjour ${nomComplet} ! Vous êtes <strong>DÉJÀ enregistré</strong> pour aujourd'hui (${todayColumn.toLowerCase()}).`, 
         "success"
@@ -241,21 +194,11 @@ async function checkPresenceWithQR(userId) {
     }
 
     await apiPatchById(userId, { [todayColumn]: "Présent" });
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/01592d42-904b-4726-b815-4fe7c1031a60',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        sessionId:'debug-session',
-        runId:'pre-fix',
-        hypothesisId:'H3',
-        location:'src/main.js:checkPresenceWithQR:patched',
-        message:'Marked user present for today via QR',
-        data:{ userId, todayColumn },
-        timestamp:Date.now()
-      })
-    }).catch(()=>{});
-    // #endregion agent log
+    try {
+      window.localStorage.setItem('presenceUserId', userId);
+    } catch (e) {
+      // ignore stockage local si désactivé
+    }
     showStatus(
       `🎉 ${nomComplet} ! Votre présence du <strong>${todayColumn.toLowerCase()}</strong> est bien <strong>ENREGISTRÉE</strong> !`,
       "success"
@@ -265,22 +208,6 @@ async function checkPresenceWithQR(userId) {
     console.error("Erreur checkPresenceWithQR:", error);
     const message = String(error && error.message ? error.message : error);
     const errorDetails = message || String(error) || "Erreur inconnue";
-
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/01592d42-904b-4726-b815-4fe7c1031a60',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        sessionId:'debug-session',
-        runId:'pre-fix',
-        hypothesisId:'H4',
-        location:'src/main.js:checkPresenceWithQR:error',
-        message:'Error in checkPresenceWithQR',
-        data:{ userId, todayColumn, errorMessage:errorDetails, errorType:error?.constructor?.name, fullError:JSON.stringify(error) },
-        timestamp:Date.now()
-      })
-    }).catch(()=>{});
-    // #endregion agent log
 
     // Toujours afficher le détail de l'erreur pour faciliter le debug
     if (errorDetails.includes("404") || errorDetails.includes("not found") || errorDetails.includes("introuvable")) {
@@ -336,6 +263,53 @@ async function quickPresenceCheck(nom, prenom) {
   }
 }
 
+// ✅ PRÉSENCE VIA QR GLOBAL (eventQr=1)
+// - Si l'utilisateur existe (Nom/Prénom), on marque "Présent" pour aujourd'hui.
+// - Sinon, on redirige automatiquement vers le formulaire complet (APP_BASE_URL).
+async function eventQrPresenceCheck(nom, prenom) {
+  const todayColumn = getTodayColumnName();
+  const statusEl = document.getElementById('event-status');
+  
+  try {
+    statusEl.innerHTML = "🔍 Vérification dans le registre...";
+    statusEl.className = 'form-message form-message--info';
+
+    const users = await apiSearchByName(nom, prenom);
+
+    if (!Array.isArray(users) || users.length === 0) {
+      statusEl.innerHTML = "❌ Vous n'êtes pas encore inscrit(e). Redirection vers le formulaire d'inscription...";
+      statusEl.className = 'form-message form-message--error';
+      setTimeout(() => {
+        window.location.href = APP_BASE_URL;
+      }, 2000);
+      return;
+    }
+
+    const user = users[0];
+    const nomComplet = `${user.Nom || ''} ${user.Prénom || ''}`.trim() || "Utilisateur";
+
+    if (user[todayColumn] === "Présent") {
+      statusEl.innerHTML = `✅ ${nomComplet} ! Votre présence de ${todayColumn.toLowerCase()} est déjà enregistrée.`;
+      statusEl.className = 'form-message form-message--success';
+      return;
+    }
+
+    await apiPatchById(user.ID, { [todayColumn]: "Présent" });
+    statusEl.innerHTML = `🎉 ${nomComplet} ! Votre présence de <strong>${todayColumn.toLowerCase()}</strong> est bien enregistrée !`;
+    statusEl.className = 'form-message form-message--success';
+
+    // Nettoyage des champs
+    const nomInput = document.getElementById('event-nom');
+    const prenomInput = document.getElementById('event-prenom');
+    if (nomInput) nomInput.value = '';
+    if (prenomInput) prenomInput.value = '';
+
+  } catch (error) {
+    statusEl.innerHTML = `❌ Erreur: ${error.message}`;
+    statusEl.className = 'form-message form-message--error';
+  }
+}
+
 function showStatus(message, type) {
   const messageBox = document.querySelector("#form-message");
   if (messageBox) {
@@ -347,6 +321,7 @@ function showStatus(message, type) {
 const app = document.querySelector("#app");
 const urlParams = new URLSearchParams(window.location.search);
 const qrUserId = urlParams.get('userId');
+const isEventQR = urlParams.get('eventQr') === '1';
 
 let htmlContent = `
   <div class="app-bg">
@@ -356,6 +331,11 @@ let htmlContent = `
 
 if (qrUserId) {
   htmlContent += `<div id="loading">🔍 Vérification de votre présence...</div>`;
+} else if (isEventQR) {
+  // Vue spéciale pour le QR global : vérification automatique via userId stocké
+  htmlContent += `
+      <div id="loading">🔍 Vérification de votre présence...</div>
+      <div id="event-status" class="form-message"></div>`;
 } else {
   htmlContent += `
       <form id="presence-form" autocomplete="off">
@@ -408,24 +388,32 @@ htmlContent += `
 app.innerHTML = htmlContent;
 
 async function init() {
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/01592d42-904b-4726-b815-4fe7c1031a60',{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({
-      sessionId:'debug-session',
-      runId:'pre-fix',
-      hypothesisId:'H10',
-      location:'src/main.js:init:entry',
-      message:'Init function called',
-      data:{ qrUserId, hasQrUserId:!!qrUserId, url:window.location.href },
-      timestamp:Date.now()
-    })
-  }).catch(()=>{});
-  // #endregion agent log
-
   if (qrUserId) {
     await checkPresenceWithQR(qrUserId);
+    return;
+  }
+
+  // Mode QR global (un seul QR pour tous, basé sur l'ID stocké sur l'appareil)
+  if (isEventQR) {
+    const eventStatus = document.getElementById('event-status');
+    const loading = document.getElementById('loading');
+
+    const storedId = window.localStorage.getItem('presenceUserId');
+
+    if (!storedId) {
+      if (loading) loading.style.display = 'none';
+      if (eventStatus) {
+        eventStatus.innerHTML = `❌ Aucun profil enregistré sur cet appareil.<br>
+          <a href="${APP_BASE_URL}" style="color:#4ea5ff; text-decoration:underline;">Cliquez ici pour vous inscrire</a>.`;
+        eventStatus.className = 'form-message form-message--error';
+      }
+      return;
+    }
+
+    // Si on a déjà un ID, on utilise immédiatement le flux QR par ID
+    await checkPresenceWithQR(storedId);
+    if (loading) loading.style.display = 'none';
+
     return;
   }
 
@@ -470,22 +458,6 @@ async function init() {
       }
 
       try {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/01592d42-904b-4726-b815-4fe7c1031a60',{
-          method:'POST',
-          headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({
-            sessionId:'debug-session',
-            runId:'pre-fix',
-            hypothesisId:'H5',
-            location:'src/main.js:form-submit:before-search',
-            message:'Submit full form, before search',
-            data:{ nom, prenom, organisation },
-            timestamp:Date.now()
-          })
-        }).catch(()=>{});
-        // #endregion agent log
-
         const existingUsers = await apiSearchByName(nom, prenom);
 
         let userId, isNewUser = false;
@@ -509,25 +481,15 @@ async function init() {
           await apiCreateUser(newUserPayload);
         }
 
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/01592d42-904b-4726-b815-4fe7c1031a60',{
-          method:'POST',
-          headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({
-            sessionId:'debug-session',
-            runId:'pre-fix',
-            hypothesisId:'H6',
-            location:'src/main.js:form-submit:before-patch',
-            message:'Before patch presence after submit',
-            data:{ userId, isNewUser, todayColumn },
-            timestamp:Date.now()
-          })
-        }).catch(()=>{});
-        // #endregion agent log
-
         await apiPatchById(userId, { [todayColumn]: "Présent" });
 
         if (isNewUser) {
+          // Mémoriser l'ID nouvellement créé pour les prochains scans du QR global
+          try {
+            window.localStorage.setItem('presenceUserId', userId);
+          } catch (e) {
+            // ignore stockage local si désactivé
+          }
           const profileLink = `${APP_BASE_URL}?userId=${userId}`;
           showStatus(
             `🎉 Premier enregistrement ! Votre QR Code se télécharge...<br>
@@ -548,6 +510,11 @@ async function init() {
             document.querySelector("#form-message").appendChild(qrImg);
           }, 1000);
         } else {
+          try {
+            window.localStorage.setItem('presenceUserId', userId);
+          } catch (e) {
+            // ignore stockage local si désactivé
+          }
           showStatus("✅ Présence enregistrée ! Utilisez votre QR Code.", "success");
         }
 
