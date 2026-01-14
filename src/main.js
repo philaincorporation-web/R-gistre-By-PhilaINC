@@ -168,10 +168,12 @@ async function generateGlobalPresenceQR({ force = false } = {}) {
     ctx.fillText('SCANNER POUR SIGNER', 170, 395);
     
     const finalDataUrl = canvas.toDataURL('image/png');
-    const link = document.createElement('a');
-    link.href = finalDataUrl;
-    link.download = `Presence_GLOBAL_EVENT.png`;
-    link.click();
+    // On ne déclenche plus de téléchargement automatique pour éviter les boucles.
+    // On expose juste l'URL dans la console pour que tu puisses l'ouvrir / enregistrer manuellement.
+    if (typeof window !== "undefined") {
+      window.LAST_GLOBAL_QR = finalDataUrl;
+      console.log("QR global généré. Copie/ouvre window.LAST_GLOBAL_QR pour l'enregistrer.");
+    }
   };
   qrImg.src = qrUrl;
   
