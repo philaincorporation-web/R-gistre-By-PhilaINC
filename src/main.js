@@ -170,6 +170,11 @@ async function generateGlobalPresenceQR() {
   return qrUrl;
 }
 
+// Rendre accessible depuis la console du navigateur
+if (typeof window !== "undefined") {
+  window.generateGlobalPresenceQR = generateGlobalPresenceQR;
+}
+
 // ✅ VÉRIFICATION ANTI-TRICHERIE + MESSAGE PERSONNALISÉ (pour QR)
 async function checkPresenceWithQR(userId) {
   const todayColumn = getTodayColumnName();
