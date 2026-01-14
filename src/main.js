@@ -131,7 +131,15 @@ async function generateAndDownloadQR(userId, nom, prenom) {
 // ✅ QR CODE GLOBAL (UNIQUE) POUR L'ÉVÉNEMENT
 // Ce QR pointe vers APP_BASE_URL?eventQr=1 et permet à n'importe quel participant
 // de scanner pour marquer sa présence via une recherche Nom/Prénom.
-async function generateGlobalPresenceQR() {
+let globalQRGenerated = false;
+async function generateGlobalPresenceQR({ force = false } = {}) {
+  // Empêche les téléchargements en boucle si la fonction est appelée plusieurs fois involontairement
+  if (globalQRGenerated && !force) {
+    console.warn("QR global déjà généré sur cette page. Passez { force: true } pour regénérer.");
+    return null;
+  }
+  globalQRGenerated = true;
+
   const qrLink = `${APP_BASE_URL}?eventQr=1`;
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrLink)}&color=000000&bgcolor=FFFFFF&qzone=1`;
   
