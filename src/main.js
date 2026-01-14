@@ -1,8 +1,108 @@
-// main.js COMPLET - ANTI-TRICHERIE + MESSAGE PERSONNALISÉ
+// main.js COMPLET - ANTI-TRICHERIE + MESSAGE PERSONNALISÉ + BOUTON PRÉSENCE RAPIDE ✅
 import "./style.css";
 import 'animate.css';
 
 const API_URL = "https://sheetdb.io/api/v1/f7c1tqp21ex4d";
+// 👉 Remplace cette URL par celle de ton site Vercel en ligne
+const APP_BASE_URL = "https://r-gistre-by-phila-inc.vercel.app";
+
+// Utilitaires API
+async function apiRequest(url, options = {}) {
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/01592d42-904b-4726-b815-4fe7c1031a60',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      sessionId:'debug-session',
+      runId:'pre-fix',
+      hypothesisId:'H7',
+      location:'src/main.js:apiRequest:before-fetch',
+      message:'API request starting',
+      data:{ url, method:options.method || 'GET' },
+      timestamp:Date.now()
+    })
+  }).catch(()=>{});
+  // #endregion agent log
+
+  const response = await fetch(url, options);
+  let data = null;
+
+  // Certaines erreurs SheetDB renvoient aussi du JSON, on essaie sans planter
+  try {
+    data = await response.json();
+  } catch (e) {
+    // Pas de JSON exploitable, on laisse data à null
+  }
+
+  if (!response.ok) {
+    const message =
+      (data && (data.message || data.error)) ||
+      `Erreur réseau (${response.status})`;
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/01592d42-904b-4726-b815-4fe7c1031a60',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        sessionId:'debug-session',
+        runId:'pre-fix',
+        hypothesisId:'H8',
+        location:'src/main.js:apiRequest:error',
+        message:'API request failed',
+        data:{ url, status:response.status, statusText:response.statusText, message, data },
+        timestamp:Date.now()
+      })
+    }).catch(()=>{});
+    // #endregion agent log
+
+    throw new Error(message);
+  }
+
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/01592d42-904b-4726-b815-4fe7c1031a60',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      sessionId:'debug-session',
+      runId:'pre-fix',
+      hypothesisId:'H9',
+      location:'src/main.js:apiRequest:success',
+      message:'API request succeeded',
+      data:{ url, status:response.status, hasData:!!data },
+      timestamp:Date.now()
+    })
+  }).catch(()=>{});
+  // #endregion agent log
+
+  return data;
+}
+
+async function apiGetById(userId) {
+  return apiRequest(`${API_URL}/ID/${encodeURIComponent(userId)}`);
+}
+
+async function apiSearchByName(nom, prenom) {
+  const searchUrl = `${API_URL}/search?Nom=${encodeURIComponent(
+    nom
+  )}&Prénom=${encodeURIComponent(prenom)}`;
+  return apiRequest(searchUrl);
+}
+
+async function apiPatchById(userId, data) {
+  return apiRequest(`${API_URL}/ID/${encodeURIComponent(userId)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ data }),
+  });
+}
+
+async function apiCreateUser(payload) {
+  return apiRequest(API_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ data: [payload] }),
+  });
+}
 
 function getTodayColumnName() {
   const days = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
@@ -19,20 +119,16 @@ function generateUserId() {
 // Message personnalisé avec infos utilisateur
 async function getUserInfo(userId) {
   try {
-    const userRes = await fetch(`${API_URL}/ID/${userId}`);
-    if (userRes.ok) {
-      const userData = await userRes.json();
-      return `${userData.Nom} ${userData.Prénom}`;
-    }
+    const userData = await apiGetById(userId);
+    return `${userData.Nom} ${userData.Prénom}`;
   } catch (e) {
     return "Utilisateur";
   }
-  return "Utilisateur";
 }
 
 // ✅ QR PROFESSIONNEL via API QRServer
 async function generateAndDownloadQR(userId, nom, prenom) {
-  const qrLink = `${window.location.origin}${window.location.pathname}?userId=${userId}`;
+  const qrLink = `${APP_BASE_URL}?userId=${userId}`;
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrLink)}&color=000000&bgcolor=FFFFFF&qzone=1`;
   
   const canvas = document.createElement('canvas');
@@ -70,24 +166,47 @@ async function generateAndDownloadQR(userId, nom, prenom) {
   return qrUrl;
 }
 
-// ✅ VÉRIFICATION ANTI-TRICHERIE + MESSAGE PERSONNALISÉ
+// ✅ VÉRIFICATION ANTI-TRICHERIE + MESSAGE PERSONNALISÉ (pour QR)
 async function checkPresenceWithQR(userId) {
   const todayColumn = getTodayColumnName();
   
   try {
-    // Récupérer infos utilisateur
-    const userRes = await fetch(`${API_URL}/ID/${userId}`);
-    const userData = await userRes.json();
-    
-    if (!userRes.ok) {
-      showStatus("❌ Utilisateur introuvable. Veuillez vous réinscrire.", "error");
-      return;
-    }
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/01592d42-904b-4726-b815-4fe7c1031a60',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        sessionId:'debug-session',
+        runId:'pre-fix',
+        hypothesisId:'H1',
+        location:'src/main.js:checkPresenceWithQR:entry',
+        message:'Enter checkPresenceWithQR',
+        data:{ userId, todayColumn },
+        timestamp:Date.now()
+      })
+    }).catch(()=>{});
+    // #endregion agent log
+
+    const userData = await apiGetById(userId);
 
     const nomComplet = `${userData.Nom || ''} ${userData.Prénom || ''}`.trim() || "Utilisateur";
 
-    // ✅ ANTI-TRICHERIE : Vérifier si déjà présent aujourd'hui
     if (userData[todayColumn] === "Présent") {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/01592d42-904b-4726-b815-4fe7c1031a60',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          sessionId:'debug-session',
+          runId:'pre-fix',
+          hypothesisId:'H2',
+          location:'src/main.js:checkPresenceWithQR:already-present',
+          message:'User already marked present for today',
+          data:{ userId, todayColumn },
+          timestamp:Date.now()
+        })
+      }).catch(()=>{});
+      // #endregion agent log
       showStatus(
         `✅ Bonjour ${nomComplet} ! Vous êtes <strong>DÉJÀ enregistré</strong> pour aujourd'hui (${todayColumn.toLowerCase()}).`, 
         "success"
@@ -95,33 +214,108 @@ async function checkPresenceWithQR(userId) {
       return;
     }
 
-    // Marquer présent (1 seule fois/jour)
-    const updateBody = { data: { [todayColumn]: "Présent" } };
-    const updateRes = await fetch(`${API_URL}/ID/${userId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(updateBody)
-    });
-
-    if (updateRes.ok) {
-      // ✅ MESSAGE PERSONNALISÉ AVEC SUCCÈS
-      showStatus(
-        `🎉 ${nomComplet} ! Votre présence du <strong>${todayColumn.toLowerCase()}</strong> est bien <strong>ENREGISTRÉE</strong> !`, 
-        "success"
-      );
-    } else {
-      throw new Error("Erreur enregistrement");
-    }
+    await apiPatchById(userId, { [todayColumn]: "Présent" });
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/01592d42-904b-4726-b815-4fe7c1031a60',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        sessionId:'debug-session',
+        runId:'pre-fix',
+        hypothesisId:'H3',
+        location:'src/main.js:checkPresenceWithQR:patched',
+        message:'Marked user present for today via QR',
+        data:{ userId, todayColumn },
+        timestamp:Date.now()
+      })
+    }).catch(()=>{});
+    // #endregion agent log
+    showStatus(
+      `🎉 ${nomComplet} ! Votre présence du <strong>${todayColumn.toLowerCase()}</strong> est bien <strong>ENREGISTRÉE</strong> !`,
+      "success"
+    );
     
   } catch (error) {
-    showStatus("❌ Erreur technique. Veuillez vous réinscrire.", "error");
+    console.error("Erreur checkPresenceWithQR:", error);
+    const message = String(error && error.message ? error.message : error);
+    const errorDetails = message || String(error) || "Erreur inconnue";
+
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/01592d42-904b-4726-b815-4fe7c1031a60',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        sessionId:'debug-session',
+        runId:'pre-fix',
+        hypothesisId:'H4',
+        location:'src/main.js:checkPresenceWithQR:error',
+        message:'Error in checkPresenceWithQR',
+        data:{ userId, todayColumn, errorMessage:errorDetails, errorType:error?.constructor?.name, fullError:JSON.stringify(error) },
+        timestamp:Date.now()
+      })
+    }).catch(()=>{});
+    // #endregion agent log
+
+    // Toujours afficher le détail de l'erreur pour faciliter le debug
+    if (errorDetails.includes("404") || errorDetails.includes("not found") || errorDetails.includes("introuvable")) {
+      showStatus(`❌ Utilisateur introuvable (${errorDetails}). Veuillez vous réinscrire.`, "error");
+    } else {
+      showStatus(`❌ Erreur technique: ${errorDetails}. Veuillez réessayer ou vous réinscrire.`, "error");
+    }
+  }
+}
+
+// ✅ PRÉSENCE RAPIDE PAR NOM/PRÉNOM ✅
+async function quickPresenceCheck(nom, prenom) {
+  const todayColumn = getTodayColumnName();
+  const statusEl = document.getElementById('quick-status');
+  
+  try {
+    statusEl.innerHTML = "🔍 Vérification...";
+    statusEl.className = 'form-message form-message--info';
+
+    // Recherche SheetDB (exact match)
+    const users = await apiSearchByName(nom, prenom);
+
+    if (!Array.isArray(users) || users.length === 0) {
+      statusEl.innerHTML = "❌ Non trouvé. <strong>Remplissez le formulaire complet</strong> pour vous identifier.";
+      statusEl.className = 'form-message form-message--error';
+      setTimeout(() => {
+        document.getElementById('quick-form').style.display = 'none';
+        document.getElementById('presence-form').style.display = 'block';
+      }, 2000);
+      return;
+    }
+
+    const user = users[0];
+    const nomComplet = `${user.Nom || ''} ${user.Prénom || ''}`.trim() || "Utilisateur";
+
+    if (user[todayColumn] === "Présent") {
+      statusEl.innerHTML = `✅ ${nomComplet} ! Vous êtes <strong>DÉJÀ enregistré</strong> pour ${todayColumn.toLowerCase()}.`;
+      statusEl.className = 'form-message form-message--success';
+      return;
+    }
+
+    await apiPatchById(user.ID, { [todayColumn]: "Présent" });
+    statusEl.innerHTML = `🎉 ${nomComplet} ! Présence <strong>${todayColumn.toLowerCase()}</strong> enregistrée !`;
+    statusEl.className = 'form-message form-message--success';
+    
+    // Reset quick form
+    document.getElementById('quick-nom').value = '';
+    document.getElementById('quick-prenom').value = '';
+
+  } catch (error) {
+    statusEl.innerHTML = `❌ Erreur: ${error.message}`;
+    statusEl.className = 'form-message form-message--error';
   }
 }
 
 function showStatus(message, type) {
   const messageBox = document.querySelector("#form-message");
-  messageBox.innerHTML = message; // HTML autorisé pour <strong>
-  messageBox.className = `form-message form-message--${type}`;
+  if (messageBox) {
+    messageBox.innerHTML = message;
+    messageBox.className = `form-message form-message--${type}`;
+  }
 }
 
 const app = document.querySelector("#app");
@@ -151,7 +345,15 @@ if (qrUserId) {
           <label class="form-label" for="organisation">Organisation / Service</label>
           <input class="form-input" id="organisation" name="organisation" type="text" placeholder="Nom de votre organisation" />
         </div>
-        <button type="submit" class="form-button">Enregistrer ma présence</button>
+        <!-- ✅ BOUTON PRÉSENCE RAPIDE -->
+        <button type="button" id="quick-check-btn" class="btn-quick-check">📱 Présence rapide</button>
+        <div id="quick-form" style="display:none;">
+          <input type="text" id="quick-nom" placeholder="Votre nom" />
+          <input type="text" id="quick-prenom" placeholder="Votre prénom" />
+          <button type="button" id="submit-quick" class="form-button">Valider présence</button>
+        </div>
+        <div id="quick-status" class="form-message"></div>
+        <button type="submit" id="submit-full" class="form-button" style="margin-top: 10px;">Enregistrer ma présence (complet)</button>
       </form>`;
 }
 
@@ -180,12 +382,52 @@ htmlContent += `
 app.innerHTML = htmlContent;
 
 async function init() {
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/01592d42-904b-4726-b815-4fe7c1031a60',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      sessionId:'debug-session',
+      runId:'pre-fix',
+      hypothesisId:'H10',
+      location:'src/main.js:init:entry',
+      message:'Init function called',
+      data:{ qrUserId, hasQrUserId:!!qrUserId, url:window.location.href },
+      timestamp:Date.now()
+    })
+  }).catch(()=>{});
+  // #endregion agent log
+
   if (qrUserId) {
-    // ✅ Scan QR → Message personnalisé + anti-tricherie
     await checkPresenceWithQR(qrUserId);
     return;
   }
 
+  // ✅ Écouteurs bouton présence rapide
+  const quickBtn = document.getElementById('quick-check-btn');
+  const submitQuick = document.getElementById('submit-quick');
+  
+  if (quickBtn) {
+    quickBtn.addEventListener('click', () => {
+      document.getElementById('quick-form').style.display = 'block';
+      document.getElementById('submit-full').style.display = 'none';
+    });
+  }
+
+  if (submitQuick) {
+    submitQuick.addEventListener('click', async () => {
+      const nom = document.getElementById('quick-nom').value.trim();
+      const prenom = document.getElementById('quick-prenom').value.trim();
+      if (nom && prenom) {
+        await quickPresenceCheck(nom, prenom);
+      } else {
+        document.getElementById('quick-status').innerHTML = "❌ Nom et prénom requis.";
+        document.getElementById('quick-status').className = 'form-message form-message--error';
+      }
+    });
+  }
+
+  // Formulaire complet
   const form = document.querySelector("#presence-form");
   if (form) {
     form.addEventListener("submit", async (e) => {
@@ -202,9 +444,23 @@ async function init() {
       }
 
       try {
-        const searchUrl = `${API_URL}/search?Nom=${encodeURIComponent(nom)}&Prénom=${encodeURIComponent(prenom)}`;
-        const searchRes = await fetch(searchUrl);
-        const existingUsers = await searchRes.json();
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/01592d42-904b-4726-b815-4fe7c1031a60',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({
+            sessionId:'debug-session',
+            runId:'pre-fix',
+            hypothesisId:'H5',
+            location:'src/main.js:form-submit:before-search',
+            message:'Submit full form, before search',
+            data:{ nom, prenom, organisation },
+            timestamp:Date.now()
+          })
+        }).catch(()=>{});
+        // #endregion agent log
+
+        const existingUsers = await apiSearchByName(nom, prenom);
 
         let userId, isNewUser = false;
 
@@ -214,38 +470,49 @@ async function init() {
           userId = generateUserId();
           isNewUser = true;
           
-          const createBody = {
-            data: [{
-              ID: userId,
-              Nom: nom,
-              Prénom: prenom,
-              Organisation: organisation,
-              Dimanche: "", Lundi: "", Mardi: "", Mercredi: "",
-              Jeudi: "", Vendredi: "", Samedi: "",
-              "Date de création": new Date().toISOString()
-            }]
+          const newUserPayload = {
+            ID: userId,
+            Nom: nom,
+            Prénom: prenom,
+            Organisation: organisation,
+            Dimanche: "", Lundi: "", Mardi: "", Mercredi: "",
+            Jeudi: "", Vendredi: "", Samedi: "",
+            "Date de création": new Date().toISOString()
           };
-          
-          await fetch(API_URL, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(createBody)
-          });
+
+          await apiCreateUser(newUserPayload);
         }
 
-        const updateBody = { data: { [todayColumn]: "Présent" } };
-        await fetch(`${API_URL}/ID/${userId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(updateBody)
-        });
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/01592d42-904b-4726-b815-4fe7c1031a60',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({
+            sessionId:'debug-session',
+            runId:'pre-fix',
+            hypothesisId:'H6',
+            location:'src/main.js:form-submit:before-patch',
+            message:'Before patch presence after submit',
+            data:{ userId, isNewUser, todayColumn },
+            timestamp:Date.now()
+          })
+        }).catch(()=>{});
+        // #endregion agent log
+
+        await apiPatchById(userId, { [todayColumn]: "Présent" });
 
         if (isNewUser) {
-          showStatus("🎉 Premier enregistrement ! Votre QR Code se télécharge...", "success");
+          const profileLink = `${APP_BASE_URL}?userId=${userId}`;
+          showStatus(
+            `🎉 Premier enregistrement ! Votre QR Code se télécharge...<br>
+             <small>Ou cliquez sur ce lien pour mettre votre présence à jour : 
+             <a href="${profileLink}" target="_blank" rel="noopener noreferrer">${profileLink}</a></small>`,
+            "success"
+          );
           await generateAndDownloadQR(userId, nom, prenom);
           
           setTimeout(() => {
-            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(`${window.location.origin}${window.location.pathname}?userId=${userId}`)}`;
+            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(`${APP_BASE_URL}?userId=${userId}`)}`;
             const qrImg = document.createElement('img');
             qrImg.src = qrUrl;
             qrImg.style.maxWidth = '250px';

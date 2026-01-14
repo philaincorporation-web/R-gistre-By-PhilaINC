@@ -32,6 +32,59 @@ body {
   backdrop-filter: blur(4px);
 }
 
+.btn-quick-check {
+  background: #4CAF50;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 16px;
+  cursor: pointer;
+  width: 100%;
+  margin-top: 10px;
+}
+.quick-container {
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.btn-large {
+  padding: 16px 32px !important;
+  font-size: 18px !important;
+  background: linear-gradient(135deg, #4CAF50, #45a049) !important;
+}
+
+.info-box {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 20px;
+  border-radius: 12px;
+  margin: 20px 0;
+  text-align: center;
+}
+
+.back-link {
+  color: #2c5aa0;
+  text-decoration: none;
+  font-weight: bold;
+}
+
+.back-link:hover {
+  text-decoration: underline;
+}
+
+#quick-form {
+  margin-top: 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+#quick-form input {
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+}
+
 /* Titre */
 .form-title {
   font-size: 1.4rem;
