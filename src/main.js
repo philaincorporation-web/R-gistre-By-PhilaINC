@@ -1,20 +1,42 @@
-// main.js COMPLET - LIEN UNIQUE 1 SCAN/JOUR + ANTI-TRICHERIE ✅
+// main.js COMPLET - VALIDITÉ 1 MINUTE + ANTI-TRICHERIE ✅
 import "./style.css";
 import 'animate.css';
 
 const API_URL = "https://sheetdb.io/api/v1/f7c1tqp21ex4d";
 const APP_BASE_URL = "https://r-gistre-by-phila-inc.vercel.app";
 
-// 🚨 DATE D'AUJOURD'HUI POUR VALIDATION
-const TODAY_DATE = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+// 🔧 CONFIGURATION : 1 MINUTE DE VALIDITÉ
+let LINK_VALIDITY_CONFIG = {
+  unit: 'minute',  
+  value: 1         // 1 minute exactement
+};
+
+// 📅 Calcul date d'expiration
+function calculateExpirationDate() {
+  const now = new Date();
+  const config = LINK_VALIDITY_CONFIG;
+  
+  switch(config.unit) {
+    case 'second': now.setSeconds(now.getSeconds() + config.value); break;
+    case 'minute': now.setMinutes(now.getMinutes() + config.value); break;
+    case 'hour':   now.setHours(now.getHours() + config.value); break;
+    case 'day':    now.setDate(now.getDate() + config.value); break;
+    default: now.setMinutes(now.getMinutes() + 1);
+  }
+  return now.toISOString();
+}
+
+// ✅ Vérifie si lien encore valide
+function isLinkStillValid(expirationDateStr) {
+  const expiration = new Date(expirationDateStr);
+  return new Date() < expiration;
+}
 
 // Utilitaires API (inchangés)
 async function apiRequest(url, options = {}) {
   const response = await fetch(url, options);
   let data = null;
-  try {
-    data = await response.json();
-  } catch (e) {}
+  try { data = await response.json(); } catch (e) {}
   if (!response.ok) {
     const message = (data && (data.message || data.error)) || `Erreur réseau (${response.status})`;
     throw new Error(message);
@@ -25,15 +47,13 @@ async function apiRequest(url, options = {}) {
 async function apiGetById(userId) {
   const results = await apiRequest(`${API_URL}/search?ID=${encodeURIComponent(userId)}`);
   if (!Array.isArray(results) || results.length === 0) {
-    const notFoundError = new Error("404: ID not found");
-    throw notFoundError;
+    throw new Error("404: ID not found");
   }
   return results[0];
 }
 
 async function apiSearchByName(nom, prenom) {
-  const searchUrl = `${API_URL}/search?Nom=${encodeURIComponent(nom)}&Prénom=${encodeURIComponent(prenom)}`;
-  return apiRequest(searchUrl);
+  return apiRequest(`${API_URL}/search?Nom=${encodeURIComponent(nom)}&Prénom=${encodeURIComponent(prenom)}`);
 }
 
 async function apiPatchById(userId, data) {
@@ -54,8 +74,7 @@ async function apiCreateUser(payload) {
 
 function getTodayColumnName() {
   const days = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
-  const today = new Date();
-  return days[today.getDay()];
+  return days[new Date().getDay()];
 }
 
 function generateUserId() {
@@ -64,7 +83,7 @@ function generateUserId() {
   return `U-${now}-${rand}`.toUpperCase();
 }
 
-// ✅ VÉRIFICATION LIEN UNIQUE + ANTI-TRICHERIE
+// ✅ VÉRIFICATION 1 MINUTE + ANTI-TRICHERIE
 async function checkPresenceWithQR(userId) {
   const todayColumn = getTodayColumnName();
   
@@ -72,44 +91,43 @@ async function checkPresenceWithQR(userId) {
     const userData = await apiGetById(userId);
     const nomComplet = `${userData.Nom || ''} ${userData.Prénom || ''}`.trim() || "Utilisateur";
 
-    // 🚫 LIEN DÉJÀ UTILISÉ (1 scan = invalide)
+    // 🚫 LIEN DÉJÀ UTILISÉ
     if (userData.LienInvalide === "OUI") {
+      showStatus(`❌ 🚫 Ce QR a été <strong>DÉJÀ UTILISÉ</strong>.`, "error");
+      return;
+    }
+
+    // 🚫 LIEN EXPIRÉ (1 MINUTE)
+    if (userData.DateExpiration && !isLinkStillValid(userData.DateExpiration)) {
       showStatus(
-        `❌ 🚫 Ce lien QR a été <strong>DÉJÀ UTILISÉ</strong> aujourd'hui. Contactez l'organisateur pour un nouveau QR.`,
+        `❌ ⏰ QR <strong>EXPIRE</strong> après 1 min. Générez-en un nouveau.`,
         "error"
       );
       return;
     }
 
-    // 🚫 DÉJÀ PRÉSENT AUJOURD'HUI
+    // 🚫 DÉJÀ PRÉSENT
     if (userData[todayColumn] === "Présent") {
-      showStatus(
-        `✅ ${nomComplet} ! Vous êtes <strong>DÉJÀ enregistré</strong> pour ${todayColumn.toLowerCase()}.`,
-        "success"
-      );
+      showStatus(`✅ ${nomComplet} ! Déjà enregistré aujourd'hui.`, "success");
       return;
     }
 
-    // ✅ 1ER SCAN : Marquer présent ET invalider le lien
+    // ✅ VALIDATION : Marquer + Invalider + 1 min expiration
+    const expirationDate = calculateExpirationDate();
     await apiPatchById(userId, { 
       [todayColumn]: "Présent",
-      LienInvalide: "OUI"  // ← LIEN RENDU INVALIDE
+      LienInvalide: "OUI",
+      DateExpiration: expirationDate
     });
 
     showStatus(
-      `🎉 ${nomComplet} ! Présence <strong>${todayColumn.toLowerCase()}</strong> validée ! 
-       <br><small>🔒 Ce lien est maintenant <strong>invalide</strong>.</small>`,
+      `🎉 ${nomComplet} ! Présence <strong>VALIDÉE</strong> en ${todayColumn.toLowerCase()} !
+       <br><small>🔒 QR invalide après <strong>1 MIN</strong>.</small>`,
       "success"
     );
 
   } catch (error) {
-    console.error("Erreur checkPresenceWithQR:", error);
-    const errorDetails = error.message || String(error) || "Erreur inconnue";
-    if (errorDetails.includes("404") || errorDetails.includes("not found")) {
-      showStatus(`❌ Utilisateur introuvable. Veuillez vous réinscrire.`, "error");
-    } else {
-      showStatus(`❌ Erreur: ${errorDetails}`, "error");
-    }
+    showStatus(`❌ Erreur: ${error.message}`, "error");
   }
 }
 
@@ -121,7 +139,7 @@ function showStatus(message, type) {
   }
 }
 
-// Initialisation HTML
+// HTML + Initialisation
 const app = document.querySelector("#app");
 const urlParams = new URLSearchParams(window.location.search);
 const qrUserId = urlParams.get('userId');
@@ -134,7 +152,7 @@ let htmlContent = `
       <h2 class="animate__animated animate__bounce">Formation DGIeWOMEN SCHOOL/ASSINCO.SA</h2>`;
 
 if (qrUserId) {
-  htmlContent += `<div id="loading">🔍 Vérification de votre présence...</div>`;
+  htmlContent += `<div id="loading">🔍 Vérification (valide 1 min)...</div>`;
 } else {
   htmlContent += `
       <br>
@@ -195,13 +213,11 @@ htmlContent += `
 app.innerHTML = htmlContent;
 
 async function init() {
-  // 🚨 MODE QR : Vérification + invalidation
   if (qrUserId) {
     await checkPresenceWithQR(qrUserId);
     return;
   }
 
-  // Formulaire complet (création + présence)
   const form = document.querySelector("#presence-form");
   if (form) {
     form.addEventListener("submit", async (e) => {
@@ -215,7 +231,7 @@ async function init() {
       const formation = document.querySelector("#formation").value;
 
       if (!nom || !prenom || !telephone || !formation) {
-        showStatus("❌ Nom, prénom, téléphone et formation sont requis.", "error");
+        showStatus("❌ Tous les champs requis sont obligatoires.", "error");
         return;
       }
 
@@ -238,26 +254,24 @@ async function init() {
             Formation: formation,
             Dimanche: "", Lundi: "", Mardi: "", Mercredi: "",
             Jeudi: "", Vendredi: "", Samedi: "",
-            LienInvalide: "",  // ← Colonne pour invalidation
+            LienInvalide: "",
+            DateExpiration: "",
             "Date de création": new Date().toISOString()
           };
-
           await apiCreateUser(newUserPayload);
         }
 
-        // Marquer présent
         await apiPatchById(userId, { [todayColumn]: "Présent" });
 
         if (isNewUser) {
           showStatus(
-            `🎉 ${nom} ${prenom} ! Premier enregistrement réussi !<br>
-             <small>📱 Générez votre QR personnel via l'organisateur.</small>`,
+            `🎉 ${nom} ${prenom} ! Inscription réussie !<br>
+             <small>📱 Demandez votre QR 1 min à l'organisateur.</small>`,
             "success"
           );
         } else {
-          showStatus("✅ Présence enregistrée avec succès !", "success");
+          showStatus("✅ Présence enregistrée !", "success");
         }
-
         form.reset();
       } catch (error) {
         showStatus("❌ Erreur: " + error.message, "error");
