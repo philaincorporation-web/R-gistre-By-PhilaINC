@@ -43,7 +43,7 @@ body {
 @media (min-width: 1024px) {
   .app-bg {
     background-size: 50vw;
-    padding: 32px;
+    padding: 20px;
   }
 }
 
@@ -55,7 +55,7 @@ body {
   max-width: 420px;
   background: rgba(0, 0, 0, 0.55);
   border-radius: 16px;
-  padding: 24px 20px;
+  padding: 20px 20px;
   color: #f9fafb;
   backdrop-filter: blur(4px);
 }
@@ -205,17 +205,25 @@ body {
 }
 
 .social-link {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 999px;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
   background: rgba(15, 23, 42, 0.8);
   border: 1px solid rgba(148, 163, 184, 0.6);
-  text-decoration: none;
-  transition: background 0.15s ease, transform 0.1s ease, border-color 0.15s ease;
+  transition: all 0.2s ease;
 }
+
+.social-icon {
+ border-radius: 40px;
+  object-fit: contain;
+  display: block;   /* supprime l’espace blanc sous l’image */
+  width: 100%;      /* l’image occupe toute la largeur */
+  height: auto;  
+}
+
 
 .social-link:hover {
   background: rgba(34, 197, 94, 0.18);
@@ -223,11 +231,8 @@ body {
   transform: translateY(-1px);
 }
 
-.social-icon {
-  width: 20px;
-  height: 20px;
-  object-fit: contain;
-}
+
+
 
 /* Petits écrans : réduire légèrement */
 @media (max-width: 480px) {
@@ -251,4 +256,25 @@ body {
   .form-title {
     font-size: 1.25rem;
   }
+}
+.banner-container {
+  
+  
+  width: 100%; max-width: 1400px;
+  border-radius: 15px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+}
+.banner-container img {
+  display: block;   /* supprime l’espace blanc sous l’image */
+  width: 100%;      /* l’image occupe toute la largeur */
+  height: auto;     /* conserve les proportions */
+}
+
+.banner-image {
+  justify-content: center;
+  align-items: center;
+  width: 100%; height: 250px; object-fit: cover;
+}
+@media (max-width: 278px) {
+  .banner-image { height: 110px; }
+  
 }

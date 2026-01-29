@@ -1,44 +1,66 @@
-// main.js COMPLET - VALIDITÉ 1 MINUTE + GÉNÉRATEUR QR TEST ✅
+// main.js COMPLET - IP 40 MIN + BANNière + FORMULAIRE OK
 import "./style.css";
 import 'animate.css';
 
 const API_URL = "https://sheetdb.io/api/v1/f7c1tqp21ex4d";
 const APP_BASE_URL = "https://r-gistre-by-phila-inc.vercel.app";
 
-// 🔧 CONFIGURATION : 1 MINUTE DE VALIDITÉ
-let LINK_VALIDITY_CONFIG = {
-  unit: 'minute',  
-  value: 1         // 1 minute exactement
-};
+let LINK_VALIDITY_CONFIG = { unit: 'minute', value: 1 };
+const IP_VALIDITY_MINUTES = 40;
+const IP_API_URL = 'https://ipinfo.io/json';
 
-// 📅 Calcul date d'expiration
 function calculateExpirationDate() {
   const now = new Date();
   const config = LINK_VALIDITY_CONFIG;
-  
   switch(config.unit) {
     case 'second': now.setSeconds(now.getSeconds() + config.value); break;
     case 'minute': now.setMinutes(now.getMinutes() + config.value); break;
-    case 'hour':   now.setHours(now.getHours() + config.value); break;
-    case 'day':    now.setDate(now.getDate() + config.value); break;
+    case 'hour': now.setHours(now.getHours() + config.value); break;
+    case 'day': now.setDate(now.getDate() + config.value); break;
     default: now.setMinutes(now.getMinutes() + 1);
   }
   return now.toISOString();
 }
 
-// ✅ Vérifie si lien encore valide
 function isLinkStillValid(expirationDateStr) {
-  const expiration = new Date(expirationDateStr);
-  return new Date() < expiration;
+  return new Date() < new Date(expirationDateStr);
 }
 
-// Utilitaires API
+async function checkIPValidity(userId) {
+  try {
+    const ipResponse = await fetch(IP_API_URL);
+    const ipData = await ipResponse.json();
+    const userIP = ipData.ip;
+
+    const results = await fetch(`${API_URL}/search?ID=${userId}&IPUtilisateur=${userIP}`);
+    const ipRecords = await results.json();
+    
+    if (Array.isArray(ipRecords) && ipRecords.length > 0) {
+      const record = ipRecords[0];
+      if (record.DateIPExpiration && !isLinkStillValid(record.DateIPExpiration)) {
+        return { valid: false, reason: `❌ IP ${userIP.slice(0,8)}... expirée (40 min)` };
+      }
+    }
+
+    const ipExpiration = new Date(Date.now() + IP_VALIDITY_MINUTES * 60000).toISOString();
+    await fetch(`${API_URL}/ID/${userId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: { IPUtilisateur: userIP, DateIPExpiration: ipExpiration } })
+    });
+
+    return { valid: true, ip: userIP };
+  } catch (error) {
+    return { valid: true, ip: 'unknown' };
+  }
+}
+
 async function apiRequest(url, options = {}) {
   const response = await fetch(url, options);
   let data = null;
   try { data = await response.json(); } catch (e) {}
   if (!response.ok) {
-    const message = (data && (data.message || data.error)) || `Erreur réseau (${response.status})`;
+    const message = (data && (data.message || data.error)) || `Erreur (${response.status})`;
     throw new Error(message);
   }
   return data;
@@ -46,9 +68,7 @@ async function apiRequest(url, options = {}) {
 
 async function apiGetById(userId) {
   const results = await apiRequest(`${API_URL}/search?ID=${encodeURIComponent(userId)}`);
-  if (!Array.isArray(results) || results.length === 0) {
-    throw new Error("404: ID not found");
-  }
+  if (!Array.isArray(results) || results.length === 0) throw new Error("ID not found");
   return results[0];
 }
 
@@ -78,41 +98,37 @@ function getTodayColumnName() {
 }
 
 function generateUserId() {
-  const now = Date.now().toString(36);
-  const rand = Math.random().toString(36).substring(2, 8);
-  return `U-${now}-${rand}`.toUpperCase();
+  return `U-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 8)}`.toUpperCase();
 }
 
-// ✅ VÉRIFICATION 1 MINUTE + ANTI-TRICHERIE
 async function checkPresenceWithQR(userId) {
   const todayColumn = getTodayColumnName();
   
   try {
+    const ipCheck = await checkIPValidity(userId);
+    if (!ipCheck.valid) {
+      showStatus(ipCheck.reason, "error");
+      return;
+    }
+
     const userData = await apiGetById(userId);
     const nomComplet = `${userData.Nom || ''} ${userData.Prénom || ''}`.trim() || "Utilisateur";
 
-    // 🚫 LIEN DÉJÀ UTILISÉ
     if (userData.LienInvalide === "OUI") {
-      showStatus(`❌ 🚫 Ce QR a été <strong>DÉJÀ UTILISÉ</strong>.`, "error");
+      showStatus(`❌ Ce QR a été DÉJÀ UTILISÉ.`, "error");
       return;
     }
 
-    // 🚫 LIEN EXPIRÉ (1 MINUTE)
     if (userData.DateExpiration && !isLinkStillValid(userData.DateExpiration)) {
-      showStatus(
-        `❌ ⏰ QR <strong>EXPIRE</strong> après 1 min. Générez-en un nouveau.`,
-        "error"
-      );
+      showStatus(`❌ QR EXPIRE après 1 min.`, "error");
       return;
     }
 
-    // 🚫 DÉJÀ PRÉSENT
     if (userData[todayColumn] === "Présent") {
-      showStatus(`✅ ${nomComplet} ! Déjà enregistré aujourd'hui.`, "success");
+      showStatus(`✅ ${nomComplet} ! Déjà enregistré.`, "success");
       return;
     }
 
-    // ✅ VALIDATION : Marquer + Invalider + 1 min expiration
     const expirationDate = calculateExpirationDate();
     await apiPatchById(userId, { 
       [todayColumn]: "Présent",
@@ -121,8 +137,7 @@ async function checkPresenceWithQR(userId) {
     });
 
     showStatus(
-      `🎉 ${nomComplet} ! Présence <strong>VALIDÉE</strong> en ${todayColumn.toLowerCase()} !
-       <br><small>🔒 QR invalide après <strong>1 MIN</strong>.</small>`,
+      `🎉 ${nomComplet} ! Présence VALIDÉE !<br><small>🔒 IP ${ipCheck.ip.slice(0,8)}... 40 min</small>`,
       "success"
     );
 
@@ -139,121 +154,104 @@ function showStatus(message, type) {
   }
 }
 
-// 🔥 GÉNÉRATEUR QR TEST 1 MINUTE (F12 → Console)
 window.generateTestQR = async function(nom = "TEST", prenom = "USER") {
   try {
     const userId = generateUserId();
-    const todayColumn = getTodayColumnName();
-    
     const testUser = {
-      ID: userId,
-      Nom: nom,
-      Prénom: prenom,
-      Organisation: "TEST-EVENT",
-      Telephone: "0000000000",
-      Formation: "Bureautique appliquée",
-      Dimanche: "", Lundi: "", Mardi: "", Mercredi: "",
-      Jeudi: "", Vendredi: "", Samedi: "",
-      LienInvalide: "",
-      DateExpiration: "",
+      ID: userId, Nom: nom, Prénom: prenom, Organisation: "TEST-EVENT",
+      Telephone: "0000000000", Formation: "Bureautique appliquée",
+      Dimanche: "", Lundi: "", Mardi: "", Mercredi: "", Jeudi: "", Vendredi: "", Samedi: "",
+      LienInvalide: "", DateExpiration: "", IPUtilisateur: "", DateIPExpiration: "",
       "Date de création": new Date().toISOString()
     };
     
     await apiCreateUser(testUser);
-    
     const qrLink = `${APP_BASE_URL}?userId=${userId}`;
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrLink)}&color=000000&bgcolor=FFFFFF&qzone=1`;
     
-    console.log(`✅ UTILISATEUR CRÉÉ: ${nom} ${prenom}`);
-    console.log(`🆔 ID: ${userId}`);
-    console.log(`🔗 LIEN: ${qrLink}`);
-    console.log(`🖼️ QR: ${qrUrl}`);
-    console.log(`⏱️ VALIDITÉ: 1 MINUTE`);
-    
+    console.log(`✅ ID: ${userId}\n🔗 ${qrLink}\n🖼️ ${qrUrl}`);
     window.open(qrUrl, '_blank');
-    alert(`✅ QR TEST 1 MIN généré ! Ouvre la console (F12) pour tous les détails.`);
-    
+    alert(`✅ QR généré ! Console F12`);
   } catch (error) {
-    console.error('Erreur génération QR:', error);
-    alert('❌ Erreur création utilisateur: ' + error.message);
+    alert('❌ ' + error.message);
   }
-};
+}
 
-// HTML
+// ✅ HTML COMPLET + BANNière (SYNTAXE VITÉ OK)
 const app = document.querySelector("#app");
 const urlParams = new URLSearchParams(window.location.search);
 const qrUserId = urlParams.get('userId');
 
 let htmlContent = `
-  <div class="app-bg">
-    <div class="app-overlay">
-      <h1 class="animate__animated animate__bounce">Régistre de présence</h1>
-      <br>
-      <h2 class="animate__animated animate__bounce">Formation DGIeWOMEN SCHOOL/ASSINCO.SA</h2>`;
+<div class="app-bg">
+  <div class="app-overlay">
+   <!-- 🔥 BANNière -->
+    <div class="banner-container">
+      <img src="/banRegistre.png" alt="DGIeWOMEN" class="banner-image"/>
+    </div>
+
+    <br>
+   `;
 
 if (qrUserId) {
-  htmlContent += `<div id="loading">🔍 Vérification QR (valide 1 min)...</div>`;
+  htmlContent += `<div id="loading">🔍 Vérification QR + IP (40 min/jour)...</div>`;
 } else {
   htmlContent += `
-    <div style="background: rgba(0,0,0,0.8); padding: 20px; border-radius: 12px; margin: 20px 0;">
-      <h3 style="color: #2c5aa0; margin-bottom: 10px;">🧪 MODE TEST (Console F12)</h3>
-      <p><strong>generateTestQR("Marie", "DUPONT")</strong> → Génère QR 1 min</p>
-      <p><em>Validité: 1 scan + 1 minute seulement !</em></p>
-    </div>
+   
     <br>
     <form id="presence-form" autocomplete="off">
       <div class="form-group">
-        <label class="form-label" for="nom">Nom</label>
-        <input class="form-input" id="nom" name="nom" type="text" placeholder="Veuillez saisir correctement votre Nom" required />
+        <label class="form-label" data-for="nom">Nom</label>
+        <input class="form-input" id="nom" name="nom" type="text" placeholder="Veuillez entrée votre Nom" required />
       </div>
       <div class="form-group">
-        <label class="form-label" for="prenom">Prénom</label>
-        <input class="form-input" id="prenom" name="prenom" type="text" placeholder="Veuillez saisir correctement votre prénom" required />
+        <label class="form-label" data-for="prenom">Prénom</label>
+        <input class="form-input" id="prenom" name="prenom" type="text" placeholder="Veuillez entrée votre prénom" required />
       </div>
       <div class="form-group">
-        <label class="form-label" for="organisation">Organisation / Service</label>
-        <input class="form-input" id="organisation" name="organisation" type="text" placeholder="Veuillez renseigner votre poste ou département" />
+        <label class="form-label" data-for="organisation">Organisation / Service</label>
+        <input class="form-input" id="organisation" name="organisation" type="text" placeholder="Poste/département" />
       </div>
       <div class="form-group">
-        <label class="form-label" for="telephone">Numéro de téléphone</label>
-        <input class="form-input" id="telephone" name="telephone" type="tel" placeholder="Entrez votre numéro de téléphone" required />
+        <label class="form-label" data-for="telephone">Téléphone</label>
+        <input class="form-input" id="telephone" name="telephone" type="tel" placeholder="Numéro" required />
       </div>
       <div class="form-group">
-        <label class="form-label" for="formation">Formation</label>
+        <label class="form-label" data-for="formation">Formation</label>
         <select class="form-input" id="formation" name="formation" required>
           <option value="">Choisissez votre formation</option>
           <option value="Bureautique appliquée">Bureautique appliquée</option>
-          <option value="Cybersécurité">Cybersécurité</option>
-          <option value="Intelligence artificielle">Intelligence artificielle</option>
+          <option value="Cybersécurité">Cybersécurité & IA</option>
+         
         </select>
       </div>
-      <button type="submit" id="submit-full" class="form-button" style="margin-top: 10px;">Enregistrer ma présence</button>
+      <button type="submit" class="form-button" style="margin-top:10px;">Enregistrer ma présence</button>
     </form>`;
 }
 
 htmlContent += `
-      <div id="form-message" class="form-message"></div>
-      <div class="social-bar">
-        <a href="https://www.digiewomenawards.com/" target="_blank" class="social-link">
-          <img src="/digie.jpeg" alt="Digie" class="social-icon" />
-        </a>
-        <a href="https://www.linkedin.com/company/digiewomen-school/" target="_blank" class="social-link">
-          <img src="/linkdin.jpg" alt="LinkedIn" class="social-icon" />
-        </a>
-        <a href="https://www.facebook.com/digiewomenschool" target="_blank" class="social-link">
-          <img src="/facebook.jpg" alt="Facebook" class="social-icon" />
-        </a>
-        <a href="https://whatsapp.com/channel/0029VaufFo67T8bY1a1drU15" target="_blank" class="social-link">
-          <img src="/whatsapp.jpg" alt="WhatsApp" class="social-icon" />
-        </a>
-        <a href="https://www.instagram.com/digiewomenschool?igsh=MXNnZTQ2dDg2OHE0OA==" target="_blank" class="social-link">
-          <img src="/Insta.jpg" alt="Instagram" class="social-icon" />
-        </a>
-      </div>
-      <br>
-      <p class="form-subtitle">Copyright © 2026 DigieWOMEN SCHOOL Tous droits réservés.</p>
+    <div id="form-message" class="form-message"></div>
+    <div class="social-bar">
+      <a href="https://www.digiewomenawards.com/" target="_blank" class="social-link">
+        <img src="/web.jpg" alt="Digie" class="social-icon" />
+      </a>
+      <a href="https://www.linkedin.com/company/digiewomen-school/" target="_blank" class="social-link">
+        <img src="/linkdin3.jpg" alt="LinkedIn" class="social-icon" />
+      </a>
+      <a href="https://www.facebook.com/digiewomenschool" target="_blank" class="social-link">
+        <img src="/facebk.jpg" alt="Facebook" class="social-icon" />
+      </a>
+      <a href="https://whatsapp.com/channel/0029VaufFo67T8bY1a1drU15" target="_blank" class="social-link">
+        <img src="/whats1.jpg" alt="WhatsApp" class="social-icon" />
+      </a>
+      <a href="https://www.instagram.com/digiewomenschool?igsh=MXNnZTQ2dDg2OHE0OA==" target="_blank" class="social-link">
+        <img src="/ints.jpg" alt="Instagram" class="social-icon" />
+      </a>
     </div>
-  </div>`;
+    <br>
+    <p class="form-subtitle">Copyright © 2026 DigieWOMEN SCHOOL Tous droits réservés.</p>
+  </div>
+</div>`;
 
 app.innerHTML = htmlContent;
 
@@ -267,7 +265,6 @@ async function init() {
   if (form) {
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
-      
       const todayColumn = getTodayColumnName();
       const nom = document.querySelector("#nom").value.trim();
       const prenom = document.querySelector("#prenom").value.trim();
@@ -286,37 +283,28 @@ async function init() {
 
         if (Array.isArray(existingUsers) && existingUsers.length > 0) {
           userId = existingUsers[0].ID;
+          const ipCheck = await checkIPValidity(userId);
+          if (!ipCheck.valid) {
+            showStatus(ipCheck.reason, "error");
+            return;
+          }
         } else {
           userId = generateUserId();
           isNewUser = true;
-          
           const newUserPayload = {
-            ID: userId,
-            Nom: nom,
-            Prénom: prenom,
-            Organisation: organisation,
-            Telephone: telephone,
-            Formation: formation,
-            Dimanche: "", Lundi: "", Mardi: "", Mercredi: "",
-            Jeudi: "", Vendredi: "", Samedi: "",
-            LienInvalide: "",
-            DateExpiration: "",
+            ID: userId, Nom: nom, Prénom: prenom, Organisation: organisation,
+            Telephone: telephone, Formation: formation,
+            Dimanche: "", Lundi: "", Mardi: "", Mercredi: "", Jeudi: "", Vendredi: "", Samedi: "",
+            LienInvalide: "", DateExpiration: "", IPUtilisateur: "", DateIPExpiration: "",
             "Date de création": new Date().toISOString()
           };
           await apiCreateUser(newUserPayload);
         }
 
         await apiPatchById(userId, { [todayColumn]: "Présent" });
-
-        if (isNewUser) {
-          showStatus(
-            `🎉 ${nom} ${prenom} ! Inscription réussie !<br>
-             <small>📱 Demandez votre QR 1 min à l'organisateur.</small>`,
-            "success"
-          );
-        } else {
-          showStatus("✅ Présence enregistrée !", "success");
-        }
+        showStatus(isNewUser ? 
+          `🎉 ${nom} ${prenom} ! Inscription réussie !<br><small>📱 Demandez votre QR 1 min à l'organisateur.</small>` : 
+          "✅ Présence enregistrée !", "success");
         form.reset();
       } catch (error) {
         showStatus("❌ Erreur: " + error.message, "error");
