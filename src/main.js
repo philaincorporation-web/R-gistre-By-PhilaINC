@@ -151,6 +151,11 @@ function showStatus(message, type) {
   if (messageBox) {
     messageBox.innerHTML = message;
     messageBox.className = `form-message form-message--${type}`;
+    if (type === "success") {
+      messageBox.classList.add("form-message--popup");
+    } else {
+      messageBox.classList.remove("form-message--popup");
+    }
   }
 }
 
@@ -225,7 +230,11 @@ if (qrUserId) {
          
         </select>
       </div>
-      <button type="submit" class="form-button" style="margin-top:10px;">Enregistrer ma présence</button>
+      <div class="ring">Chargement
+  <span></span>
+</div>
+      <button type="submit" class="form-button" style="margin-top:10px;">Enregistrer ma présence
+    </button>
     </form>`;
 }
 
@@ -262,9 +271,15 @@ async function init() {
   }
 
   const form = document.querySelector("#presence-form");
+  const loadingRing = document.querySelector(".ring");
+  const setLoading = (isLoading) => {
+    if (loadingRing) loadingRing.classList.toggle("is-active", isLoading);
+    if (form) form.classList.toggle("is-loading", isLoading);
+  };
   if (form) {
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
+      setLoading(true);
       const todayColumn = getTodayColumnName();
       const nom = document.querySelector("#nom").value.trim();
       const prenom = document.querySelector("#prenom").value.trim();
@@ -274,6 +289,7 @@ async function init() {
 
       if (!nom || !prenom || !telephone || !formation) {
         showStatus("❌ Tous les champs requis sont obligatoires.", "error");
+        setLoading(false);
         return;
       }
 
@@ -303,11 +319,13 @@ async function init() {
 
         await apiPatchById(userId, { [todayColumn]: "Présent" });
         showStatus(isNewUser ? 
-          `🎉 ${nom} ${prenom} ! Inscription réussie !<br><small>📱 Demandez votre QR 1 min à l'organisateur.</small>` : 
+          `🎉 ${nom} ${prenom} ! Enregistrement réussie !<br>` : 
           "✅ Présence enregistrée !", "success");
         form.reset();
       } catch (error) {
         showStatus("❌ Erreur: " + error.message, "error");
+      } finally {
+        setLoading(false);
       }
     });
   }

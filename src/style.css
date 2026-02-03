@@ -154,6 +154,13 @@ body {
   color: #9ca3af;
 }
 
+/* Floute tout le formulaire pendant le chargement (sauf le loader) */
+#presence-form.is-loading > :not(.ring) {
+  filter: blur(3px);
+  opacity: 0.65;
+  pointer-events: none;
+}
+
 /* Bouton */
 .form-button {
   width: 100%;
@@ -178,7 +185,10 @@ body {
 .form-button:active {
   transform: translateY(0);
   box-shadow: none;
+  /* HTML: <div class="loader"></div> */
+
 }
+
 
 /* Message de confirmation / erreur */
 .form-message {
@@ -193,6 +203,34 @@ body {
 
 .form-message--error {
   color: #fecaca;
+}
+
+/* Popup de succès */
+.form-message--popup {
+  position: fixed;
+  left: 50%;
+  top: 24px;
+  transform: translateX(-50%);
+  background: rgba(16, 185, 129, 0.95);
+  color: #0b3b2a;
+  padding: 14px 18px;
+  border-radius: 999px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  z-index: 999;
+  animation: popupIn 0.25s ease-out;
+}
+
+@keyframes popupIn {
+  from {
+    transform: translate(-50%, -12px);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
 }
 
 .social-bar {
@@ -215,6 +253,7 @@ body {
   border: 1px solid rgba(148, 163, 184, 0.6);
   transition: all 0.2s ease;
 }
+
 
 .social-icon {
  border-radius: 40px;
@@ -277,4 +316,100 @@ body {
 @media (max-width: 278px) {
   .banner-image { height: 110px; }
   
+}
+
+
+body
+{
+  margin:0;
+  padding:0;
+  background:#262626;
+}
+.ring
+{
+  display: none;
+  position:absolute;
+  top:50%;
+  left:50%;
+  transform:translate(-50%,-50%);
+  width:190px;
+  height:190px;
+  background:transparent;
+  border:3px solid #3c3c3c;
+  border-radius:50%;
+  text-align:center;
+  line-height:150px;
+  font-family:sans-serif;
+  font-size:20px;
+  color:#22c55e;
+  letter-spacing:4px;
+  text-transform:uppercase;
+  text-shadow:0 0 10px #22c55e;
+  box-shadow:0 0 20px rgba(0,0,0,.5);
+}
+.ring.is-active
+{
+  display: block;
+  z-index: 10;
+  pointer-events: none;
+}
+.ring:before
+{
+  content:'';
+  position:absolute;
+  top:-3px;
+  left:-3px;
+  width:100%;
+  height:100%;
+  border:3px solid transparent;
+  border-top:3px solid #22c55e;
+  border-right:3px solid #22c55e;
+  border-radius:50%;
+  animation:animateC 2s linear infinite;
+}
+span
+{
+  display:block;
+  position:absolute;
+  top:calc(50% - 2px);
+  left:50%;
+  width:50%;
+  height:4px;
+  background:transparent;
+  transform-origin:left;
+  animation:animate 2s linear infinite;
+}
+span:before
+{
+  content:'';
+  position:absolute;
+  width:16px;
+  height:16px;
+  border-radius:50%;
+  background:#22c55e;
+  top:-6px;
+  right:-8px;
+  box-shadow:0 0 20px #22c55e;
+}
+@keyframes animateC
+{
+  0%
+  {
+    transform:rotate(0deg);
+  }
+  100%
+  {
+    transform:rotate(360deg);
+  }
+}
+@keyframes animate
+{
+  0%
+  {
+    transform:rotate(45deg);
+  }
+  100%
+  {
+    transform:rotate(405deg);
+  }
 }
