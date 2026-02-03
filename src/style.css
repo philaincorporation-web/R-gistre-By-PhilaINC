@@ -205,33 +205,19 @@ body {
   color: #fecaca;
 }
 
-/* Popup de succès */
-.form-message--popup {
-  position: fixed;
-  left: 50%;
-  top: 24px;
-  transform: translateX(-50%);
-  background: rgba(16, 185, 129, 0.95);
-  color: #0b3b2a;
-  padding: 14px 18px;
-  border-radius: 999px;
-  font-weight: 700;
-  letter-spacing: 0.2px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
-  z-index: 999;
-  animation: popupIn 0.25s ease-out;
+/* SweetAlert2: style de l'icône succès comme sur l'image */
+.swal2-icon.swal2-success {
+  border-color: #cfecc3 !important;
+  color: #9ad483 !important;
+}
+.swal2-icon.swal2-success .swal2-success-ring {
+  border: 0.25em solid #cfecc3 !important;
+}
+.swal2-icon.swal2-success .swal2-success-line-tip,
+.swal2-icon.swal2-success .swal2-success-line-long {
+  background-color: #9ad483 !important;
 }
 
-@keyframes popupIn {
-  from {
-    transform: translate(-50%, -12px);
-    opacity: 0;
-  }
-  to {
-    transform: translate(-50%, 0);
-    opacity: 1;
-  }
-}
 
 .social-bar {
   margin-top: 18px;

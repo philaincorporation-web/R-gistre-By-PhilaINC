@@ -1,6 +1,7 @@
 // main.js COMPLET - IP 40 MIN + BANNière + FORMULAIRE OK
 import "./style.css";
 import 'animate.css';
+import Swal from 'sweetalert2'
 
 const API_URL = "https://sheetdb.io/api/v1/f7c1tqp21ex4d";
 const APP_BASE_URL = "https://r-gistre-by-phila-inc.vercel.app";
@@ -21,6 +22,11 @@ function calculateExpirationDate() {
   }
   return now.toISOString();
 }
+Swal.fire({
+  title: "Enregitrez votre présence",
+  icon: "success",
+  draggable: true
+});
 
 function isLinkStillValid(expirationDateStr) {
   return new Date() < new Date(expirationDateStr);
@@ -151,11 +157,14 @@ function showStatus(message, type) {
   if (messageBox) {
     messageBox.innerHTML = message;
     messageBox.className = `form-message form-message--${type}`;
-    if (type === "success") {
-      messageBox.classList.add("form-message--popup");
-    } else {
-      messageBox.classList.remove("form-message--popup");
-    }
+  }
+  if ((type === "success" || type === "error") && typeof Swal !== "undefined") {
+    Swal.fire({
+      title: type === "success" ? "Succès" : "Erreur",
+      html: message,
+      icon: type === "success" ? "success" : "error",
+      draggable: true
+    });
   }
 }
 
