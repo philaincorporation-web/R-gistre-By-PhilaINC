@@ -10,6 +10,7 @@ let LINK_VALIDITY_CONFIG = { unit: 'minute', value: 1 };
 const IP_VALIDITY_MINUTES = 40;
 const IP_API_URL = 'https://api.ipify.org?format=json';
 const ALLOWED_PUBLIC_IPS = ["102.142.25.255"];
+const ALLOWED_LOCATION = { lat: 0.3925, lon: 9.4537, radiusMeters: 500 };
 
 function calculateExpirationDate() {
   const now = new Date();
@@ -75,6 +76,56 @@ async function enforceAllowedNetwork() {
     throw new Error("Connexion refusée : vous devez être sur le Wi‑Fi autorisé.");
   }
   return userIP;
+}
+
+function toRadians(value) {
+  return (value * Math.PI) / 180;
+}
+
+function calculateDistanceMeters(a, b) {
+  const R = 6371000; // meters
+  const dLat = toRadians(b.lat - a.lat);
+  const dLon = toRadians(b.lon - a.lon);
+  const lat1 = toRadians(a.lat);
+  const lat2 = toRadians(b.lat);
+
+  const h =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1) * Math.cos(lat2) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+  return R * c;
+}
+
+function getCurrentPosition() {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error("Géolocalisation non supportée par ce navigateur."));
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve(pos),
+      () => reject(new Error("Localisation refusée. Activez la géolocalisation.")),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  });
+}
+
+async function enforceAllowedLocation() {
+  const position = await getCurrentPosition();
+  const userCoords = {
+    lat: position.coords.latitude,
+    lon: position.coords.longitude
+  };
+  const distance = calculateDistanceMeters(userCoords, {
+    lat: ALLOWED_LOCATION.lat,
+    lon: ALLOWED_LOCATION.lon
+  });
+  if (distance > ALLOWED_LOCATION.radiusMeters) {
+    const km = (distance / 1000).toFixed(2);
+    throw new Error(`Vous êtes trop loin du lieu (${km} km). Restez dans 500 m.`);
+  }
+  return distance;
 }
 
 async function apiRequest(url, options = {}) {
@@ -319,6 +370,7 @@ async function init() {
       }
 
       try {
+        await enforceAllowedLocation();
         await enforceAllowedNetwork();
         const existingUsers = await apiSearchByName(nom, prenom);
         let userId, isNewUser = false;
