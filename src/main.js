@@ -8,7 +8,8 @@ const APP_BASE_URL = "https://r-gistre-by-phila-inc.vercel.app";
 
 let LINK_VALIDITY_CONFIG = { unit: 'minute', value: 1 };
 const IP_VALIDITY_MINUTES = 40;
-const IP_API_URL = 'https://ipinfo.io/json';
+const IP_API_URL = 'https://api.ipify.org?format=json';
+const ALLOWED_PUBLIC_IPS = ["102.142.25.255"];
 
 function calculateExpirationDate() {
   const now = new Date();
@@ -59,6 +60,21 @@ async function checkIPValidity(userId) {
   } catch (error) {
     return { valid: true, ip: 'unknown' };
   }
+}
+
+async function getPublicIP() {
+  const ipResponse = await fetch(IP_API_URL);
+  const ipData = await ipResponse.json();
+  return ipData.ip;
+}
+
+async function enforceAllowedNetwork() {
+  const userIP = await getPublicIP();
+  const isAllowed = ALLOWED_PUBLIC_IPS.includes(userIP);
+  if (!isAllowed) {
+    throw new Error("Connexion refusée : vous devez être sur le Wi‑Fi autorisé.");
+  }
+  return userIP;
 }
 
 async function apiRequest(url, options = {}) {
@@ -303,6 +319,7 @@ async function init() {
       }
 
       try {
+        await enforceAllowedNetwork();
         const existingUsers = await apiSearchByName(nom, prenom);
         let userId, isNewUser = false;
 
