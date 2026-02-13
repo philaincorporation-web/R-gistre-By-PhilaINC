@@ -370,7 +370,6 @@ async function init() {
       }
 
       try {
-        await enforceAllowedLocation();
         await enforceAllowedNetwork();
         const existingUsers = await apiSearchByName(nom, prenom);
         let userId, isNewUser = false;
