@@ -5,6 +5,8 @@ import Swal from 'sweetalert2'
 
 const API_URL = "https://sheetdb.io/api/v1/f7c1tqp21ex4d";
 const APP_BASE_URL = "https://r-gistre-by-phila-inc.vercel.app";
+const SHEET_COL_PRENOM = "Pr\u00C3\u00A9nom";
+const SHEET_VALUE_PRESENT = "Pr\u00C3\u00A9sent";
 
 let LINK_VALIDITY_CONFIG = { unit: 'minute', value: 1 };
 const IP_VALIDITY_MINUTES = 40;
@@ -146,7 +148,9 @@ async function apiGetById(userId) {
 }
 
 async function apiSearchByName(nom, prenom) {
-  return apiRequest(`${API_URL}/search?Nom=${encodeURIComponent(nom)}&Prénom=${encodeURIComponent(prenom)}`);
+  return apiRequest(
+    `${API_URL}/search?Nom=${encodeURIComponent(nom)}&${encodeURIComponent(SHEET_COL_PRENOM)}=${encodeURIComponent(prenom)}`
+  );
 }
 
 async function apiPatchById(userId, data) {
@@ -185,27 +189,21 @@ async function checkPresenceWithQR(userId) {
     }
 
     const userData = await apiGetById(userId);
-    const nomComplet = `${userData.Nom || ''} ${userData.Prénom || ''}`.trim() || "Utilisateur";
-
-    if (userData.LienInvalide === "OUI") {
-      showStatus(`❌ Ce QR a été DÉJÀ UTILISÉ.`, "error");
-      return;
-    }
+    const nomComplet = `${userData.Nom || ''} ${userData[SHEET_COL_PRENOM] || ''}`.trim() || "Utilisateur";
 
     if (userData.DateExpiration && !isLinkStillValid(userData.DateExpiration)) {
       showStatus(`❌ QR EXPIRE après 1 min.`, "error");
       return;
     }
 
-    if (userData[todayColumn] === "Présent") {
+    if (userData[todayColumn] === SHEET_VALUE_PRESENT) {
       showStatus(`✅ ${nomComplet} ! Déjà enregistré.`, "success");
       return;
     }
 
     const expirationDate = calculateExpirationDate();
     await apiPatchById(userId, { 
-      [todayColumn]: "Présent",
-      LienInvalide: "OUI",
+      [todayColumn]: SHEET_VALUE_PRESENT,
       DateExpiration: expirationDate
     });
 
@@ -239,11 +237,10 @@ window.generateTestQR = async function(nom = "TEST", prenom = "USER") {
   try {
     const userId = generateUserId();
     const testUser = {
-      ID: userId, Nom: nom, Prénom: prenom, Organisation: "TEST-EVENT",
+      ID: userId, Nom: nom, [SHEET_COL_PRENOM]: prenom, Organisation: "TEST-EVENT",
       Telephone: "0000000000", Formation: "Bureautique appliquée",
       Dimanche: "", Lundi: "", Mardi: "", Mercredi: "", Jeudi: "", Vendredi: "", Samedi: "",
-      LienInvalide: "", DateExpiration: "", IPUtilisateur: "", DateIPExpiration: "",
-      "Date de création": new Date().toISOString()
+      DateExpiration: "", IPUtilisateur: "", DateIPExpiration: ""
     };
     
     await apiCreateUser(testUser);
@@ -384,16 +381,15 @@ async function init() {
           userId = generateUserId();
           isNewUser = true;
           const newUserPayload = {
-            ID: userId, Nom: nom, Prénom: prenom, Organisation: organisation,
+            ID: userId, Nom: nom, [SHEET_COL_PRENOM]: prenom, Organisation: organisation,
             Telephone: telephone, Formation: formation,
             Dimanche: "", Lundi: "", Mardi: "", Mercredi: "", Jeudi: "", Vendredi: "", Samedi: "",
-            LienInvalide: "", DateExpiration: "", IPUtilisateur: "", DateIPExpiration: "",
-            "Date de création": new Date().toISOString()
+            DateExpiration: "", IPUtilisateur: "", DateIPExpiration: ""
           };
           await apiCreateUser(newUserPayload);
         }
 
-        await apiPatchById(userId, { [todayColumn]: "Présent" });
+        await apiPatchById(userId, { [todayColumn]: SHEET_VALUE_PRESENT });
         showStatus(isNewUser ? 
           `🎉 ${nom} ${prenom} ! Enregistrement réussie !<br>` : 
           "✅ Présence enregistrée !", "success");
